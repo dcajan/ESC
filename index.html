@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Eurovision Junior 2026 - Voting System</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,700;0,800;0,900;1,900&family=Teko:wght@600;700&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Montserrat', 'sans-serif'],
+            score: ['Teko', 'sans-serif'],
+          },
+          colors: {
+            euroBlue: '#0c1033',
+            euroDark: '#000033',
+            euroCard: '#0a2f7a', 
+            euroGold: '#fbbf24',
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      background-color: #000033;
+      color: white;
+      user-select: none;
+      overflow-x: hidden;
+      background-size: cover;
+      background-position: center;
+      background-attachment: fixed;
+    }
+
+    .city-skyline {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 250px;
+      background-image: url('https://upload.wikimedia.org/wikipedia/commons/thumb/1/1a/Madrid_Skyline_2016.png/1200px-Madrid_Skyline_2016.png');
+      background-size: cover;
+      background-position: bottom;
+      z-index: 0;
+      opacity: 0.8;
+      pointer-events: none;
+    }
+
+    .glass-panel {
+      background: rgba(12, 16, 51, 0.6);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.6);
+      border-radius: 16px;
+    }
+
+    /* Tarjetas - Tamaño reducido */
+    .country-item {
+      background-color: #0a2f7a;
+      border: 1px solid white;
+      border-radius: 9999px;
+      transition: transform 0.8s cubic-bezier(0.2, 0, 0, 1), background-color 0.5s ease, border-color 0.5s ease, box-shadow 0.5s ease, opacity 0.5s ease;
+      will-change: transform;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    .country-item:hover:not(.voted-current-turn) {
+      border-color: #fbbf24;
+      box-shadow: 0 4px 16px rgba(251, 191, 36, 0.3);
+    }
+
+    /* Latido Amarillo Normal */
+    @keyframes scoreBump {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.04); border-color: #fbbf24; box-shadow: 0 0 25px rgba(251, 191, 36, 0.8); }
+      100% { transform: scale(1); }
+    }
+    .anim-receiving { animation: scoreBump 0.5s ease-in-out infinite alternate; z-index: 30 !important; }
+
+    @keyframes popText {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.4); color: #fbbf24; }
+      100% { transform: scale(1); }
+    }
+    .anim-score-pop { animation: popText 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+
+    /* ESTADO BLANCO NUEVO LÍDER */
+    @keyframes flashPulse {
+      0% { box-shadow: 0 0 30px rgba(255,255,255,0.8); transform: scale(1.02); }
+      100% { box-shadow: 0 0 50px rgba(255,255,255,1); transform: scale(1.05); }
+    }
+
+    .anim-new-leader {
+      background-color: #ffffff !important;
+      border-color: #ffffff !important;
+      opacity: 1 !important; 
+      z-index: 40 !important;
+      animation: flashPulse 0.8s infinite alternate !important;
+    }
+    
+    .anim-new-leader .country-name { color: #000000 !important; }
+    .anim-new-leader .rank-badge { background-color: #e5e5e5 !important; color: #000000 !important; border-color: #000000 !important; }
+    .anim-new-leader .score-badge { background-color: #000000 !important; color: #ffffff !important; border-color: #000000 !important; }
+
+    /* EFECTO: TEXTO "NEW LEADER" ROJO A LA DERECHA */
+    @keyframes showNewLeaderText {
+      0% { opacity: 0; transform: translateX(20px); }
+      15% { opacity: 1; transform: translateX(0); }
+      85% { opacity: 1; transform: translateX(0); }
+      100% { opacity: 0; transform: translateX(20px); }
+    }
+
+    .anim-new-leader .new-leader-text {
+      animation: showNewLeaderText 2.4s cubic-bezier(0.2, 0, 0, 1) forwards !important;
+    }
+
+    /* Contenedor Banderas */
+    .flag-container {
+      width: 26px; 
+      height: 18px; 
+      border-radius: 3px;
+      overflow: hidden;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+      flex-shrink: 0;
+      background: #111;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .flag-img { width: 100%; height: 100%; object-fit: cover; }
+
+    /* ESTADO DESACTIVADO */
+    .voted-current-turn {
+      cursor: not-allowed !important;
+      pointer-events: none;
+      border-color: rgba(255, 255, 255, 0.15) !important; 
+      opacity: 1 !important; 
+      box-shadow: none !important;
+    }
+
+    /* Badges */
+    .rank-badge {
+      background-color: #0c1033;
+      color: white;
+      border-radius: 50%;
+      width: 22px; 
+      height: 22px; 
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px; 
+      font-weight: 800;
+      flex-shrink: 0;
+      border: 1px solid transparent;
+      transition: background-color 0.5s ease, color 0.5s ease;
+    }
+
+    .score-badge {
+      background-color: #0c1033;
+      color: #fbbf24;
+      border: 1px solid #0a2f7a;
+      border-radius: 9999px;
+      padding: 0 8px;
+      font-size: 16px; 
+      font-weight: bold;
+      min-width: 38px; 
+      text-align: center;
+      height: 24px; 
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: background-color 0.5s ease, color 0.5s ease;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between relative" id="appBody">
+
+  <div id="citySkyline" class="city-skyline"></div>
+  <div id="bgOverlay" class="fixed inset-0 bg-[#000033]/70 pointer-events-none transition-all duration-500 z-10"></div>
+
+  <div class="relative z-20 flex flex-col min-h-screen justify-between p-4 md:p-6 max-w-[1600px] mx-auto w-full">
+    
+    <!-- HEADER SUPERIOR -->
+    <header class="flex flex-col md:flex-row items-center justify-between gap-4 mb-4 w-full">
+      <div class="flex items-center gap-3">
+        
+        <!-- Logo -->
+        <label for="logoUploader" id="logoContainer" class="cursor-pointer relative flex items-center justify-center w-12 h-12 bg-gradient-to-r from-pink-500 to-violet-600 rounded-xl shadow-lg shrink-0 overflow-hidden transition-all hover:scale-105 border border-white/10" title="Clic para cambiar logo">
+          <i id="defaultLogoIcon" data-lucide="trophy" class="w-6 h-6 text-white absolute"></i>
+          <img id="customLogoImg" src="" class="w-full h-full object-contain hidden absolute p-1" alt="Custom Logo">
+          <input type="file" id="logoUploader" accept="image/*" class="hidden">
+        </label>
+        
+        <div class="drop-shadow-md flex flex-col items-start">
+          <h1 id="mainTitle" contenteditable="true" spellcheck="false" onblur="saveTitle()" title="Clic para editar texto" class="outline-none text-xl md:text-2xl font-black tracking-wider uppercase text-transparent bg-clip-text bg-gradient-to-r from-white via-slate-200 to-amber-300 cursor-text min-w-[200px] border-b border-transparent focus:border-white/20 transition-colors">
+            Grand Final - 2026
+          </h1>
+          <p id="instructionText" class="text-xs md:text-sm text-amber-400 font-semibold tracking-wide flex items-center gap-1.5 drop-shadow-md">
+            <span class="inline-block w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
+            Elige un país para dar <span id="currentPointsAwardLabel" class="text-white font-bold underline decoration-amber-400">1 punto</span>
+          </p>
+        </div>
+      </div>
+
+      <!-- Controles Superiores -->
+      <div id="topControls" class="flex items-center gap-2 transition-all duration-300">
+        <label for="bgUploader" class="cursor-pointer bg-[#0c1033]/80 backdrop-blur-md hover:bg-white/20 text-white text-xs px-3 py-2 rounded-lg flex items-center gap-1.5 transition border border-white/20 shadow-lg">
+          <i data-lucide="image" class="w-4 h-4"></i>
+          <span class="hidden sm:inline">Fondo</span>
+          <input type="file" id="bgUploader" accept="image/*" class="hidden">
+        </label>
+        <button onclick="openConfigModal('countries')" class="bg-[#0c1033]/80 backdrop-blur-md hover:bg-white/20 text-white text-xs px-3 py-2 rounded-lg flex items-center gap-1.5 transition border border-white/20 shadow-lg">
+          <i data-lucide="flag" class="w-4 h-4"></i>
+          <span class="hidden sm:inline">Países</span>
+        </button>
+        <button onclick="openConfigModal('juries')" class="bg-[#0c1033]/80 backdrop-blur-md hover:bg-white/20 text-white text-xs px-3 py-2 rounded-lg flex items-center gap-1.5 transition border border-white/20 shadow-lg">
+          <i data-lucide="users" class="w-4 h-4"></i>
+          <span class="hidden sm:inline">Jurados</span>
+        </button>
+        <button onclick="stopAutoVoting()" id="stopBtn" class="hidden bg-amber-500/20 backdrop-blur-md hover:bg-amber-500/30 text-amber-300 text-xs px-3 py-2 rounded-lg items-center gap-1.5 transition border border-amber-500/50 animate-pulse shadow-lg">
+          <i data-lucide="square" class="w-4 h-4"></i>
+          <span class="hidden sm:inline">Detener</span>
+        </button>
+        <button onclick="resetVotes()" class="bg-red-500/20 backdrop-blur-md hover:bg-red-500/30 text-red-300 text-xs px-3 py-2 rounded-lg flex items-center gap-1.5 transition border border-red-500/50 shadow-lg">
+          <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+          <span class="hidden sm:inline">Reiniciar</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- ÁREA PRINCIPAL -->
+    <main class="flex flex-col lg:flex-row gap-6 my-auto items-start w-full drop-shadow-2xl">
+      
+      <!-- CONTENEDOR TABLA DE POSICIONES -->
+      <div class="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6 relative min-h-[560px]" id="scoreboardContainer">
+        <div class="flex flex-col gap-1.5 relative min-h-[260px]" id="col-left">
+          <div class="text-[10px] uppercase tracking-widest text-slate-300 font-bold px-2 mb-1 flex justify-between drop-shadow-md">
+            <span id="col-left-header"></span>
+          </div>
+          <div id="col-left-list" class="flex flex-col gap-1.5 relative"></div>
+        </div>
+
+        <div class="flex flex-col gap-1.5 relative min-h-[260px]" id="col-right">
+          <div class="text-[10px] uppercase tracking-widest text-slate-300 font-bold px-2 mb-1 flex justify-between drop-shadow-md">
+            <span id="col-right-header"></span>
+          </div>
+          <div id="col-right-list" class="flex flex-col gap-1.5 relative"></div>
+        </div>
+      </div>
+
+      <!-- PANEL LATERAL DERECHO (CÁMARA + CONTROLES) -->
+      <div class="w-full lg:w-[400px] xl:w-[460px] flex-shrink-0 flex flex-col gap-4">
+        
+        <div class="glass-panel p-2 flex flex-col">
+          
+          <!-- CÁMARA (Ahora es clickeable para subir imagen) -->
+          <label for="camUploader" class="relative w-full aspect-[4/3] bg-[#050820] rounded-xl overflow-hidden border border-white/20 shadow-[0_4px_20px_rgba(0,0,0,0.5)] cursor-pointer group flex items-center justify-center" title="Clic para cambiar cámara">
+            <!-- object-contain hace que se ajuste perfectamente sin deformar ni recortar -->
+            <img id="juryCamImg" src="https://images.unsplash.com/photo-1596526131083-e8c633c948d2?q=80&w=800&auto=format&fit=crop" class="w-full h-full object-contain" alt="Jury Camera">
+            
+            <div class="absolute inset-0 bg-black/40 hidden group-hover:flex items-center justify-center transition-all">
+              <i data-lucide="camera" class="w-10 h-10 text-white opacity-80"></i>
+            </div>
+
+            <div class="absolute inset-0 shadow-[inset_0_0_40px_rgba(0,0,0,0.9)] pointer-events-none"></div>
+            <div class="absolute top-3 right-3 flex items-center gap-2 bg-black/70 px-2 py-1 rounded text-[10px] font-black text-white tracking-widest backdrop-blur-sm border border-white/10 z-10 pointer-events-none">
+              <div class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div> LIVE
+            </div>
+
+            <input type="file" id="camUploader" accept="image/*" class="hidden">
+          </label>
+
+          <div class="flex items-stretch mt-2 rounded-lg overflow-hidden border border-white/10 shadow-lg">
+            <div class="bg-[#1e2761] text-white font-black text-sm uppercase tracking-widest px-3 py-2 flex-1 flex items-center justify-center text-center">
+              <span id="spokespersonName">CARLOS MAS</span>
+            </div>
+            <div class="bg-[#2a1758] text-[#fbbf24] font-bold text-xs uppercase tracking-widest px-3 py-2 flex items-center justify-center text-center border-l border-white/10 whitespace-nowrap">
+              <span id="juryProgress">1º DE 16 PAÍSES</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="glass-panel p-4 flex flex-col">
+          <div class="flex flex-col gap-2 mb-4">
+            <button onclick="voteRandomForCurrentJury()" class="w-full bg-[#1e2761] hover:bg-blue-800 text-white text-xs font-bold py-2.5 px-4 rounded-full transition flex items-center justify-center gap-2 border border-blue-500/30 shadow-md">
+              VOTAR ALEATORIAMENTE
+            </button>
+            <button onclick="finishAllRandomly()" class="w-full bg-[#9d1b55] hover:bg-pink-700 text-white text-xs font-bold py-2.5 px-4 rounded-full transition flex items-center justify-center gap-2 shadow-md">
+              FINALIZAR TODOS
+            </button>
+          </div>
+          <div>
+            <div id="pointsBar" class="flex flex-wrap gap-2 justify-center"></div>
+          </div>
+        </div>
+
+      </div>
+
+    </main>
+  </div>
+
+  <!-- BOTÓN FLOTANTE PARA OCULTAR/MOSTRAR CONFIGURACIÓN -->
+  <button onclick="toggleConfigMenu()" class="fixed bottom-4 right-4 z-50 p-2.5 bg-black/30 hover:bg-black/60 border border-white/10 rounded-full text-white/50 hover:text-white backdrop-blur-sm transition-all duration-300 shadow-lg group" title="Ocultar/Mostrar Controles Superiores">
+    <i data-lucide="settings" class="w-5 h-5 group-hover:rotate-90 transition-transform duration-500"></i>
+  </button>
+
+  <!-- MODAL DE CONFIGURACIÓN -->
+  <div id="configModal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+    <div class="glass-panel w-full max-w-2xl p-6 max-h-[85vh] flex flex-col bg-[#0c1033]/90">
+      <div class="flex justify-between items-center pb-4 border-b border-white/10">
+        <div class="flex items-center gap-4">
+          <button id="tabCountriesBtn" onclick="switchModalTab('countries')" class="text-sm font-bold pb-1 border-b-2 border-amber-400 text-white">Configurar Países</button>
+          <button id="tabJuriesBtn" onclick="switchModalTab('juries')" class="text-sm font-bold pb-1 border-b-2 border-transparent text-slate-400 hover:text-white">Configurar Jurados</button>
+        </div>
+        <button onclick="closeConfigModal()" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-6 h-6"></i></button>
+      </div>
+      <div id="configContentList" class="flex-1 overflow-y-auto my-4 space-y-3 pr-2"></div>
+      <div class="pt-3 border-t border-white/10 flex justify-between items-center">
+        <button id="addNewItemBtn" onclick="addNewConfigItem()" class="text-xs bg-white/10 hover:bg-white/20 text-white px-3 py-2 rounded-lg flex items-center gap-1.5"><i data-lucide="plus" class="w-4 h-4"></i> Añadir</button>
+        <button onclick="saveConfigChanges()" class="text-xs bg-amber-500 hover:bg-amber-400 text-black font-extrabold px-5 py-2.5 rounded-lg shadow-lg">Guardar Cambios</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const DEFAULT_COUNTRIES = [
+      { id: 'es', name: 'SPAIN', points: 13, flagUrl: 'https://flagcdn.com/w80/es.png' },
+      { id: 'mk', name: 'NORTH MACEDONIA', points: 10, flagUrl: 'https://flagcdn.com/w80/mk.png' },
+      { id: 'sm', name: 'SAN MARINO', points: 7, flagUrl: 'https://flagcdn.com/w80/sm.png' },
+      { id: 'cy', name: 'CYPRUS', points: 7, flagUrl: 'https://flagcdn.com/w80/cy.png' },
+      { id: 'mt', name: 'MALTA', points: 6, flagUrl: 'https://flagcdn.com/w80/mt.png' },
+      { id: 'fr', name: 'FRANCE', points: 6, flagUrl: 'https://flagcdn.com/w80/fr.png' },
+      { id: 'ie', name: 'IRELAND', points: 5, flagUrl: 'https://flagcdn.com/w80/ie.png' },
+      { id: 'ge', name: 'GEORGIA', points: 3, flagUrl: 'https://flagcdn.com/w80/ge.png' },
+      { id: 'pt', name: 'PORTUGAL', points: 2, flagUrl: 'https://flagcdn.com/w80/pt.png' },
+      { id: 'am', name: 'ARMENIA', points: 1, flagUrl: 'https://flagcdn.com/w80/am.png' },
+      { id: 'nl', name: 'NETHERLANDS', points: 0, flagUrl: 'https://flagcdn.com/w80/nl.png' },
+      { id: 'me', name: 'MONTENEGRO', points: 0, flagUrl: 'https://flagcdn.com/w80/me.png' },
+      { id: 'pl', name: 'POLAND', points: 0, flagUrl: 'https://flagcdn.com/w80/pl.png' },
+      { id: 'it', name: 'ITALY', points: 0, flagUrl: 'https://flagcdn.com/w80/it.png' },
+      { id: 'ua', name: 'UKRAINE', points: 0, flagUrl: 'https://flagcdn.com/w80/ua.png' },
+      { id: 'al', name: 'ALBANIA', points: 0, flagUrl: 'https://flagcdn.com/w80/al.png' },
+    ];
+
+    const DEFAULT_JURIES = [
+      { id: 'j1', name: 'CARLOS MAS', countryName: 'SPAIN' },
+      { id: 'j2', name: 'ELENA ROSSI', countryName: 'ITALY' },
+      { id: 'j3', name: 'LUCAS MÜLLER', countryName: 'GERMANY' },
+      { id: 'j4', name: 'SOPHIE DUBOIS', countryName: 'FRANCE' },
+      { id: 'j5', name: 'MARKO PETROVIĆ', countryName: 'MONTENEGRO' },
+      { id: 'j6', name: 'ANNA KOWALSKA', countryName: 'POLAND' },
+      { id: 'j7', name: 'LIAM O\'CONNOR', countryName: 'IRELAND' },
+      { id: 'j8', name: 'NINA GOMES', countryName: 'PORTUGAL' }
+    ];
+
+    const POINTS_SEQUENCE = [1, 2, 3, 4, 5, 6, 7, 8, 10, 12];
+
+    let countries = JSON.parse(localStorage.getItem('eurovision_countries')) || DEFAULT_COUNTRIES;
+    let juries = JSON.parse(localStorage.getItem('eurovision_juries')) || DEFAULT_JURIES;
+    
+    let currentJuryIndex = 0;
+    let currentPointStepIndex = 0;
+    let isAnimating = false;
+    let autoVotingActive = false;
+    let currentModalTab = 'countries';
+    let juryVotesGiven = {};
+    let previousLeaderId = null; 
+    let activeLeaderFlashId = null; 
+
+    window.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+      sortCountries();
+      previousLeaderId = countries[0]?.id || null;
+      renderScoreboard();
+      renderJuryPanel();
+      setupBackgroundUploader();
+      setupLogoUploader();
+      setupCamUploader(); // Nueva función para la cámara
+      loadSavedTitle();
+    });
+
+    function saveTitle() {
+      const titleText = document.getElementById('mainTitle').innerText;
+      localStorage.setItem('eurovision_title', titleText);
+    }
+
+    function loadSavedTitle() {
+      const savedTitle = localStorage.getItem('eurovision_title');
+      if (savedTitle) {
+        document.getElementById('mainTitle').innerText = savedTitle;
+      }
+    }
+
+    function toggleConfigMenu() {
+      const controls = document.getElementById('topControls');
+      if (controls.classList.contains('hidden')) {
+        controls.classList.remove('hidden');
+        controls.classList.add('flex');
+      } else {
+        controls.classList.add('hidden');
+        controls.classList.remove('flex');
+      }
+    }
+
+    function sortCountries() {
+      countries.sort((a, b) => b.points - a.points);
+    }
+
+    function renderScoreboard() {
+      const colLeft = document.getElementById('col-left-list');
+      const colRight = document.getElementById('col-right-list');
+
+      colLeft.innerHTML = '';
+      colRight.innerHTML = '';
+
+      const half = Math.ceil(countries.length / 2);
+      const total = countries.length;
+      const votedCountriesForCurrentJury = juryVotesGiven[currentJuryIndex] || [];
+
+      countries.forEach((country, index) => {
+        const rank = index + 1;
+        const isVotedByCurrentJury = votedCountriesForCurrentJury.includes(country.id);
+        const card = createCountryCard(country, rank, isVotedByCurrentJury);
+        
+        if (index < half) {
+          colLeft.appendChild(card);
+        } else {
+          colRight.appendChild(card);
+        }
+      });
+
+      const currentPts = POINTS_SEQUENCE[currentPointStepIndex] || 12;
+      document.getElementById('currentPointsAwardLabel').innerText = `${currentPts} ${currentPts === 1 ? 'punto' : 'puntos'}`;
+    }
+
+    function createCountryCard(country, rank, isVoted) {
+      const div = document.createElement('div');
+      div.id = `country-card-${country.id}`;
+      const isFlashingLeader = (activeLeaderFlashId === country.id);
+
+      div.className = `country-item py-1 px-1.5 flex items-center justify-between relative overflow-hidden ${
+        isVoted ? 'voted-current-turn' : 'cursor-pointer'
+      } ${isFlashingLeader ? 'anim-new-leader' : ''}`;
+      
+      if (!isVoted) {
+        div.onclick = () => handleManualCountryClick(country.id);
+      }
+
+      div.innerHTML = `
+        <div class="flex items-center gap-2.5 relative z-10 w-full">
+          <div class="rank-badge font-score">${rank < 10 ? '0' + rank : rank}</div>
+          <div class="flag-container">
+            <img src="${country.flagUrl}" alt="${country.name}" class="flag-img" onerror="this.src='https://flagcdn.com/w80/un.png'">
+          </div>
+          <div class="relative flex-grow flex items-center h-[20px] overflow-hidden pr-2">
+            <span class="country-name font-bold text-[11px] tracking-widest uppercase text-white truncate w-full">${country.name}</span>
+            <span class="new-leader-text absolute right-0 font-black text-[9px] tracking-widest uppercase text-[#dc2626] bg-white pl-2 opacity-0 pointer-events-none">
+              NEW LEADER
+            </span>
+          </div>
+          <div class="flex items-center gap-2 pr-0.5">
+            <div id="score-box-${country.id}" class="score-badge font-score">${country.points}</div>
+          </div>
+        </div>
+      `;
+      return div;
+    }
+
+    async function addPointsToCountry(countryId, pts) {
+      if (isAnimating) return false; 
+      if (!juryVotesGiven[currentJuryIndex]) { juryVotesGiven[currentJuryIndex] = []; }
+      if (juryVotesGiven[currentJuryIndex].includes(countryId)) { return false; }
+
+      isAnimating = true;
+
+      const targetCountry = countries.find(c => c.id === countryId);
+      if (!targetCountry) { isAnimating = false; return false; }
+
+      juryVotesGiven[currentJuryIndex].push(countryId);
+
+      const cardEl = document.getElementById(`country-card-${countryId}`);
+      const scoreBox = document.getElementById(`score-box-${countryId}`);
+
+      if (cardEl) cardEl.classList.add('anim-receiving');
+      if (scoreBox) scoreBox.classList.add('anim-score-pop');
+      
+      targetCountry.points += pts;
+      if (scoreBox) scoreBox.innerText = targetCountry.points;
+
+      await new Promise(res => setTimeout(res, 600));
+
+      if (cardEl) cardEl.classList.remove('anim-receiving');
+      if (scoreBox) scoreBox.classList.remove('anim-score-pop');
+
+      await animateFLIPReorder();
+
+      if (countries[0].id !== previousLeaderId) {
+        previousLeaderId = countries[0].id;
+        activeLeaderFlashId = previousLeaderId; 
+        const newLeaderElement = document.getElementById(`country-card-${previousLeaderId}`);
+        if (newLeaderElement) newLeaderElement.classList.add('anim-new-leader');
+
+        setTimeout(() => {
+          activeLeaderFlashId = null;
+          const el = document.getElementById(`country-card-${previousLeaderId}`);
+          if (el) el.classList.remove('anim-new-leader');
+        }, 2500); 
+      }
+
+      advancePointStep();
+      isAnimating = false; 
+      return true;
+    }
+
+    async function animateFLIPReorder() {
+      const FIRST_POSITIONS = {};
+      countries.forEach(c => {
+        const el = document.getElementById(`country-card-${c.id}`);
+        if (el) FIRST_POSITIONS[c.id] = el.getBoundingClientRect();
+      });
+
+      sortCountries();
+      renderScoreboard();
+
+      countries.forEach(c => {
+        const newEl = document.getElementById(`country-card-${c.id}`);
+        const first = FIRST_POSITIONS[c.id];
+
+        if (newEl && first) {
+          const last = newEl.getBoundingClientRect();
+          const deltaX = first.left - last.left;
+          const deltaY = first.top - last.top;
+
+          if (deltaX !== 0 || deltaY !== 0) {
+            newEl.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
+            newEl.style.transition = 'none';
+            newEl.offsetHeight;
+            newEl.style.transition = 'transform 0.8s cubic-bezier(0.2, 0, 0, 1)';
+            newEl.style.transform = 'translate(0, 0)';
+          }
+        }
+      });
+      localStorage.setItem('eurovision_countries', JSON.stringify(countries));
+      await new Promise(res => setTimeout(res, 800));
+    }
+
+    function advancePointStep() {
+      currentPointStepIndex++;
+      if (currentPointStepIndex >= POINTS_SEQUENCE.length) {
+        currentPointStepIndex = 0;
+        currentJuryIndex = (currentJuryIndex + 1) % juries.length;
+      }
+      renderJuryPanel();
+      renderScoreboard(); 
+    }
+
+    function renderJuryPanel() {
+      const activeJury = juries[currentJuryIndex] || { name: 'JURADO', countryName: 'GLOBAL' };
+      document.getElementById('spokespersonName').innerText = activeJury.name;
+      document.getElementById('juryProgress').innerText = `${currentJuryIndex + 1}º DE ${juries.length} PAÍSES`;
+
+      const pointsBar = document.getElementById('pointsBar');
+      pointsBar.innerHTML = '';
+
+      POINTS_SEQUENCE.forEach((pts, idx) => {
+        const isCurrent = idx === currentPointStepIndex;
+        const isPassed = idx < currentPointStepIndex;
+        const btn = document.createElement('button');
+        btn.disabled = isPassed;
+        btn.className = `w-[38px] h-[38px] rounded-lg font-black text-sm transition flex items-center justify-center ${
+          isCurrent 
+            ? 'bg-amber-400 text-black shadow-[0_0_15px_rgba(251,191,36,0.8)] scale-110 border border-white'
+            : isPassed 
+            ? 'bg-purple-900/40 text-white/30 cursor-not-allowed border border-white/5'
+            : 'bg-[#1e2761] text-white hover:bg-blue-700 border border-white/10'
+        }`;
+        btn.innerHTML = `<span>${pts}</span>`;
+        btn.onclick = () => { currentPointStepIndex = idx; renderJuryPanel(); renderScoreboard(); };
+        pointsBar.appendChild(btn);
+      });
+    }
+
+    function handleManualCountryClick(countryId) {
+      if (autoVotingActive || isAnimating) return;
+      addPointsToCountry(countryId, POINTS_SEQUENCE[currentPointStepIndex]);
+    }
+
+    async function voteRandomForCurrentJury() {
+      if (isAnimating || autoVotingActive) return;
+      startAutoVotingUI();
+      while (currentPointStepIndex < POINTS_SEQUENCE.length && autoVotingActive) {
+        const currentVoted = juryVotesGiven[currentJuryIndex] || [];
+        const availableCountries = countries.filter(c => !currentVoted.includes(c.id));
+        if (availableCountries.length === 0) break;
+        const randomCountry = availableCountries[Math.floor(Math.random() * availableCountries.length)];
+        const success = await addPointsToCountry(randomCountry.id, POINTS_SEQUENCE[currentPointStepIndex]);
+        if (!success) break;
+        await new Promise(res => setTimeout(res, 200));
+      }
+      stopAutoVotingUI();
+    }
+
+    async function finishAllRandomly() {
+      if (isAnimating || autoVotingActive) return;
+      startAutoVotingUI();
+      while (autoVotingActive) {
+        const currentVoted = juryVotesGiven[currentJuryIndex] || [];
+        const availableCountries = countries.filter(c => !currentVoted.includes(c.id));
+        if (availableCountries.length > 0) {
+          const randomCountry = availableCountries[Math.floor(Math.random() * availableCountries.length)];
+          await addPointsToCountry(randomCountry.id, POINTS_SEQUENCE[currentPointStepIndex]);
+          await new Promise(res => setTimeout(res, 150));
+        } else {
+          advancePointStep();
+        }
+        if (currentJuryIndex === 0 && currentPointStepIndex === 0) break;
+      }
+      stopAutoVotingUI();
+    }
+
+    function startAutoVotingUI() { autoVotingActive = true; document.getElementById('stopBtn').classList.remove('hidden'); document.getElementById('stopBtn').classList.add('flex'); }
+    function stopAutoVotingUI() { autoVotingActive = false; document.getElementById('stopBtn').classList.add('hidden'); document.getElementById('stopBtn').classList.remove('flex'); }
+    function stopAutoVoting() { autoVotingActive = false; isAnimating = false; stopAutoVotingUI(); }
+
+    function resetVotes() {
+      stopAutoVoting();
+      if (confirm('¿Deseas reiniciar todos los marcadores a 0?')) {
+        countries.forEach(c => c.points = 0);
+        currentJuryIndex = 0; currentPointStepIndex = 0; juryVotesGiven = {}; activeLeaderFlashId = null; 
+        localStorage.setItem('eurovision_countries', JSON.stringify(countries));
+        sortCountries(); previousLeaderId = countries[0]?.id || null;
+        renderScoreboard(); renderJuryPanel();
+      }
+    }
+
+    function setupBackgroundUploader() {
+      const uploader = document.getElementById('bgUploader');
+      uploader.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            document.getElementById('appBody').style.backgroundImage = `url('${event.target.result}')`;
+            const skyline = document.getElementById('citySkyline');
+            if (skyline) skyline.style.display = 'none';
+            const overlay = document.getElementById('bgOverlay');
+            if (overlay) overlay.className = 'fixed inset-0 bg-black/40 backdrop-blur-[2px] pointer-events-none transition-all duration-500 z-10';
+          };
+          reader.readAsDataURL(file);
+        }
+      });
+    }
+
+    function setupLogoUploader() {
+      const uploader = document.getElementById('logoUploader');
+      uploader.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            document.getElementById('defaultLogoIcon').classList.add('hidden');
+            const customImg = document.getElementById('customLogoImg');
+            customImg.src = event.target.result;
+            customImg.classList.remove('hidden');
+            
+            const container = document.getElementById('logoContainer');
+            container.classList.remove('bg-gradient-to-r', 'from-pink-500', 'to-violet-600', 'border', 'border-white/10');
+            container.classList.add('bg-transparent');
+          };
+          reader.readAsDataURL(file);
+        }
+      });
+    }
+
+    // NUEVA FUNCIÓN PARA SUBIR IMAGEN A LA CÁMARA
+    function setupCamUploader() {
+      const uploader = document.getElementById('camUploader');
+      uploader.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            document.getElementById('juryCamImg').src = event.target.result;
+          };
+          reader.readAsDataURL(file);
+        }
+      });
+    }
+
+    function openConfigModal(tab) { stopAutoVoting(); switchModalTab(tab); document.getElementById('configModal').classList.remove('hidden'); }
+    function closeConfigModal() { document.getElementById('configModal').classList.add('hidden'); }
+
+    function switchModalTab(tab) {
+      currentModalTab = tab;
+      const tabCountriesBtn = document.getElementById('tabCountriesBtn');
+      const tabJuriesBtn = document.getElementById('tabJuriesBtn');
+      if (tab === 'countries') {
+        tabCountriesBtn.className = "text-sm font-bold pb-1 border-b-2 border-amber-400 text-white";
+        tabJuriesBtn.className = "text-sm font-bold pb-1 border-b-2 border-transparent text-slate-400 hover:text-white";
+        renderCountryConfig();
+      } else {
+        tabJuriesBtn.className = "text-sm font-bold pb-1 border-b-2 border-amber-400 text-white";
+        tabCountriesBtn.className = "text-sm font-bold pb-1 border-b-2 border-transparent text-slate-400 hover:text-white";
+        renderJuryConfig();
+      }
+    }
+
+    function renderCountryConfig() {
+      const container = document.getElementById('configContentList');
+      container.innerHTML = '';
+      countries.forEach((c, idx) => {
+        const row = document.createElement('div');
+        row.className = 'flex items-center gap-2 bg-white/5 p-2 rounded-lg border border-white/10';
+        row.innerHTML = `
+          <input type="text" value="${c.name}" data-idx="${idx}" data-field="name" class="bg-black/40 text-white text-xs p-2 rounded border border-white/10 flex-1" placeholder="Nombre">
+          <input type="text" value="${c.flagUrl}" data-idx="${idx}" data-field="flagUrl" class="bg-black/40 text-white text-xs p-2 rounded border border-white/10 flex-1" placeholder="URL Bandera">
+          <input type="number" value="${c.points}" data-idx="${idx}" data-field="points" class="bg-black/40 text-white text-xs p-2 rounded border border-white/10 w-20" placeholder="Puntos">
+          <button onclick="removeItemConfig(${idx})" class="text-red-400 hover:text-red-300 p-1"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+        `;
+        container.appendChild(row);
+      });
+      lucide.createIcons();
+    }
+
+    function renderJuryConfig() {
+      const container = document.getElementById('configContentList');
+      container.innerHTML = '';
+      juries.forEach((j, idx) => {
+        const row = document.createElement('div');
+        row.className = 'flex items-center gap-2 bg-white/5 p-2 rounded-lg border border-white/10';
+        row.innerHTML = `
+          <input type="text" value="${j.name}" data-idx="${idx}" data-field="name" class="bg-black/40 text-white text-xs p-2 rounded border border-white/10 flex-1" placeholder="Nombre Portavoz">
+          <input type="text" value="${j.countryName}" data-idx="${idx}" data-field="countryName" class="bg-black/40 text-white text-xs p-2 rounded border border-white/10 flex-1" placeholder="País Jurado">
+          <button onclick="removeItemConfig(${idx})" class="text-red-400 hover:text-red-300 p-1"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+        `;
+        container.appendChild(row);
+      });
+      lucide.createIcons();
+    }
+
+    function addNewConfigItem() {
+      if (currentModalTab === 'countries') { countries.push({ id: 'c_' + Date.now(), name: 'NUEVO PAÍS', points: 0, flagUrl: 'https://flagcdn.com/w80/un.png' }); renderCountryConfig(); }
+      else { juries.push({ id: 'j_' + Date.now(), name: 'NUEVO JURADO', countryName: 'GLOBAL' }); renderJuryConfig(); }
+    }
+
+    function removeItemConfig(idx) {
+      if (currentModalTab === 'countries') { countries.splice(idx, 1); renderCountryConfig(); }
+      else { juries.splice(idx, 1); renderJuryConfig(); }
+    }
+
+    function saveConfigChanges() {
+      const inputs = document.querySelectorAll('#configContentList input');
+      if (currentModalTab === 'countries') {
+        inputs.forEach(input => {
+          const idx = input.dataset.idx; const field = input.dataset.field;
+          if (countries[idx]) { countries[idx][field] = field === 'points' ? parseInt(input.value) || 0 : input.value; }
+        });
+        localStorage.setItem('eurovision_countries', JSON.stringify(countries)); sortCountries();
+      } else {
+        inputs.forEach(input => {
+          const idx = input.dataset.idx; const field = input.dataset.field;
+          if (juries[idx]) { juries[idx][field] = input.value; }
+        });
+        localStorage.setItem('eurovision_juries', JSON.stringify(juries));
+      }
+      previousLeaderId = countries[0]?.id || null;
+      renderScoreboard(); renderJuryPanel(); closeConfigModal();
+    }
+  </script>
+</body>
+</html>
