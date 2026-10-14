@@ -207,8 +207,7 @@
             Grand Final - 2026
           </h1>
           <p id="instructionText" class="text-xs md:text-sm text-amber-400 font-semibold tracking-wide flex items-center gap-1.5 drop-shadow-md">
-            <span class="inline-block w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
-            Elige un país para dar <span id="currentPointsAwardLabel" class="text-white font-bold underline decoration-amber-400">1 punto</span>
+            <!-- Se llena por JavaScript -->
           </p>
         </div>
       </div>
@@ -264,20 +263,15 @@
         
         <div class="glass-panel p-2 flex flex-col">
           
-          <!-- CÁMARA (Ahora es clickeable para subir imagen) -->
           <label for="camUploader" class="relative w-full aspect-[4/3] bg-[#050820] rounded-xl overflow-hidden border border-white/20 shadow-[0_4px_20px_rgba(0,0,0,0.5)] cursor-pointer group flex items-center justify-center" title="Clic para cambiar cámara">
-            <!-- object-contain hace que se ajuste perfectamente sin deformar ni recortar -->
-            <img id="juryCamImg" src="https://images.unsplash.com/photo-1596526131083-e8c633c948d2?q=80&w=800&auto=format&fit=crop" class="w-full h-full object-contain" alt="Jury Camera">
-            
+            <img id="juryCamImg" src="https://storage.googleapis.com/eurovision-com.appspot.com/renditions/public/cms/logosandassetspng/logosandassets-width%3D600.png" class="w-full h-full object-contain" alt="Jury Camera">
             <div class="absolute inset-0 bg-black/40 hidden group-hover:flex items-center justify-center transition-all">
               <i data-lucide="camera" class="w-10 h-10 text-white opacity-80"></i>
             </div>
-
             <div class="absolute inset-0 shadow-[inset_0_0_40px_rgba(0,0,0,0.9)] pointer-events-none"></div>
             <div class="absolute top-3 right-3 flex items-center gap-2 bg-black/70 px-2 py-1 rounded text-[10px] font-black text-white tracking-widest backdrop-blur-sm border border-white/10 z-10 pointer-events-none">
               <div class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div> LIVE
             </div>
-
             <input type="file" id="camUploader" accept="image/*" class="hidden">
           </label>
 
@@ -291,7 +285,7 @@
           </div>
         </div>
 
-        <div class="glass-panel p-4 flex flex-col">
+<!--         <div class="glass-panel p-4 flex flex-col">
           <div class="flex flex-col gap-2 mb-4">
             <button onclick="voteRandomForCurrentJury()" class="w-full bg-[#1e2761] hover:bg-blue-800 text-white text-xs font-bold py-2.5 px-4 rounded-full transition flex items-center justify-center gap-2 border border-blue-500/30 shadow-md">
               VOTAR ALEATORIAMENTE
@@ -299,11 +293,11 @@
             <button onclick="finishAllRandomly()" class="w-full bg-[#9d1b55] hover:bg-pink-700 text-white text-xs font-bold py-2.5 px-4 rounded-full transition flex items-center justify-center gap-2 shadow-md">
               FINALIZAR TODOS
             </button>
-          </div>
+          </div> -->
           <div>
             <div id="pointsBar" class="flex flex-wrap gap-2 justify-center"></div>
           </div>
-        </div>
+        </div> 
 
       </div>
 
@@ -386,7 +380,7 @@
       renderJuryPanel();
       setupBackgroundUploader();
       setupLogoUploader();
-      setupCamUploader(); // Nueva función para la cámara
+      setupCamUploader();
       loadSavedTitle();
     });
 
@@ -426,6 +420,8 @@
 
       const half = Math.ceil(countries.length / 2);
       const total = countries.length;
+
+
       const votedCountriesForCurrentJury = juryVotesGiven[currentJuryIndex] || [];
 
       countries.forEach((country, index) => {
@@ -440,8 +436,15 @@
         }
       });
 
-      const currentPts = POINTS_SEQUENCE[currentPointStepIndex] || 12;
-      document.getElementById('currentPointsAwardLabel').innerText = `${currentPts} ${currentPts === 1 ? 'punto' : 'puntos'}`;
+      // Update Top Instructions
+      const instructionText = document.getElementById('instructionText');
+      if (currentPointStepIndex >= POINTS_SEQUENCE.length) {
+        instructionText.innerHTML = `<i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400"></i> <span class="text-emerald-400 font-bold tracking-widest uppercase">Votación del jurado finalizada</span>`;
+      } else {
+        const currentPts = POINTS_SEQUENCE[currentPointStepIndex];
+        instructionText.innerHTML = `<span class="inline-block w-2 h-2 rounded-full bg-amber-400 animate-ping"></span> Elige un país para dar <span class="text-white font-bold underline decoration-amber-400">${currentPts} ${currentPts === 1 ? 'punto' : 'puntos'}</span>`;
+      }
+      lucide.createIcons();
     }
 
     function createCountryCard(country, rank, isVoted) {
@@ -478,7 +481,8 @@
     }
 
     async function addPointsToCountry(countryId, pts) {
-      if (isAnimating) return false; 
+      if (isAnimating || currentPointStepIndex >= POINTS_SEQUENCE.length) return false; 
+      
       if (!juryVotesGiven[currentJuryIndex]) { juryVotesGiven[currentJuryIndex] = []; }
       if (juryVotesGiven[currentJuryIndex].includes(countryId)) { return false; }
 
@@ -557,10 +561,7 @@
 
     function advancePointStep() {
       currentPointStepIndex++;
-      if (currentPointStepIndex >= POINTS_SEQUENCE.length) {
-        currentPointStepIndex = 0;
-        currentJuryIndex = (currentJuryIndex + 1) % juries.length;
-      }
+      // A diferencia de antes, ahora NO avanzamos al siguiente jurado automáticamente
       renderJuryPanel();
       renderScoreboard(); 
     }
@@ -568,36 +569,52 @@
     function renderJuryPanel() {
       const activeJury = juries[currentJuryIndex] || { name: 'JURADO', countryName: 'GLOBAL' };
       document.getElementById('spokespersonName').innerText = activeJury.name;
-      document.getElementById('juryProgress').innerText = `${currentJuryIndex + 1}º DE ${juries.length} PAÍSES`;
+      document.getElementById('juryProgress').innerText = `${currentJuryIndex + 1}º DE ${juries.length} JURADOS`;
 
       const pointsBar = document.getElementById('pointsBar');
       pointsBar.innerHTML = '';
 
-      POINTS_SEQUENCE.forEach((pts, idx) => {
-        const isCurrent = idx === currentPointStepIndex;
-        const isPassed = idx < currentPointStepIndex;
-        const btn = document.createElement('button');
-        btn.disabled = isPassed;
-        btn.className = `w-[38px] h-[38px] rounded-lg font-black text-sm transition flex items-center justify-center ${
-          isCurrent 
-            ? 'bg-amber-400 text-black shadow-[0_0_15px_rgba(251,191,36,0.8)] scale-110 border border-white'
-            : isPassed 
-            ? 'bg-purple-900/40 text-white/30 cursor-not-allowed border border-white/5'
-            : 'bg-[#1e2761] text-white hover:bg-blue-700 border border-white/10'
-        }`;
-        btn.innerHTML = `<span>${pts}</span>`;
-        btn.onclick = () => { currentPointStepIndex = idx; renderJuryPanel(); renderScoreboard(); };
-        pointsBar.appendChild(btn);
-      });
+      // Si el jurado ya entregó todos sus puntos, mostrar botón de "SIGUIENTE JURADO"
+      if (currentPointStepIndex >= POINTS_SEQUENCE.length) {
+        const nextBtn = document.createElement('button');
+        nextBtn.className = 'w-full bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black tracking-widest py-3 px-4 rounded-lg transition shadow-[0_0_15px_rgba(5,150,105,0.5)] flex items-center justify-center gap-2 border border-emerald-400/50 mt-2';
+        nextBtn.innerHTML = 'SIGUIENTE JURADO <i data-lucide="arrow-right" class="w-4 h-4"></i>';
+        nextBtn.onclick = () => {
+          currentPointStepIndex = 0;
+          currentJuryIndex = (currentJuryIndex + 1) % juries.length;
+          renderJuryPanel();
+          renderScoreboard();
+          lucide.createIcons();
+        };
+        pointsBar.appendChild(nextBtn);
+        lucide.createIcons();
+      } else {
+        POINTS_SEQUENCE.forEach((pts, idx) => {
+          const isCurrent = idx === currentPointStepIndex;
+          const isPassed = idx < currentPointStepIndex;
+          const btn = document.createElement('button');
+          btn.disabled = isPassed;
+          btn.className = `w-[38px] h-[38px] rounded-lg font-black text-sm transition flex items-center justify-center ${
+            isCurrent 
+              ? 'bg-amber-400 text-black shadow-[0_0_15px_rgba(251,191,36,0.8)] scale-110 border border-white'
+              : isPassed 
+              ? 'bg-purple-900/40 text-white/30 cursor-not-allowed border border-white/5'
+              : 'bg-[#1e2761] text-white hover:bg-blue-700 border border-white/10'
+          }`;
+          btn.innerHTML = `<span>${pts}</span>`;
+          btn.onclick = () => { currentPointStepIndex = idx; renderJuryPanel(); renderScoreboard(); };
+          pointsBar.appendChild(btn);
+        });
+      }
     }
 
     function handleManualCountryClick(countryId) {
-      if (autoVotingActive || isAnimating) return;
+      if (autoVotingActive || isAnimating || currentPointStepIndex >= POINTS_SEQUENCE.length) return;
       addPointsToCountry(countryId, POINTS_SEQUENCE[currentPointStepIndex]);
     }
 
     async function voteRandomForCurrentJury() {
-      if (isAnimating || autoVotingActive) return;
+      if (isAnimating || autoVotingActive || currentPointStepIndex >= POINTS_SEQUENCE.length) return;
       startAutoVotingUI();
       while (currentPointStepIndex < POINTS_SEQUENCE.length && autoVotingActive) {
         const currentVoted = juryVotesGiven[currentJuryIndex] || [];
@@ -614,17 +631,42 @@
     async function finishAllRandomly() {
       if (isAnimating || autoVotingActive) return;
       startAutoVotingUI();
+      
+      // Si el jurado ya había terminado, pasamos al siguiente automáticamente antes de arrancar
+      if (currentPointStepIndex >= POINTS_SEQUENCE.length) {
+        currentPointStepIndex = 0;
+        currentJuryIndex = (currentJuryIndex + 1) % juries.length;
+        if (currentJuryIndex === 0) { stopAutoVotingUI(); return; } // Terminó el juego
+        renderJuryPanel();
+        renderScoreboard();
+        await new Promise(res => setTimeout(res, 300));
+      }
+
       while (autoVotingActive) {
+        // Al terminar el jurado actual, pasa al siguiente de forma automática
+        if (currentPointStepIndex >= POINTS_SEQUENCE.length) {
+          currentPointStepIndex = 0;
+          currentJuryIndex = (currentJuryIndex + 1) % juries.length;
+          
+          if (currentJuryIndex === 0) break; // Ya dio la vuelta completa a todos los jurados
+          
+          renderJuryPanel();
+          renderScoreboard();
+          await new Promise(res => setTimeout(res, 400));
+          continue;
+        }
+
         const currentVoted = juryVotesGiven[currentJuryIndex] || [];
         const availableCountries = countries.filter(c => !currentVoted.includes(c.id));
+        
         if (availableCountries.length > 0) {
           const randomCountry = availableCountries[Math.floor(Math.random() * availableCountries.length)];
           await addPointsToCountry(randomCountry.id, POINTS_SEQUENCE[currentPointStepIndex]);
           await new Promise(res => setTimeout(res, 150));
         } else {
-          advancePointStep();
+          // Failsafe por si faltan países configurados
+          currentPointStepIndex = POINTS_SEQUENCE.length; 
         }
-        if (currentJuryIndex === 0 && currentPointStepIndex === 0) break;
       }
       stopAutoVotingUI();
     }
@@ -683,7 +725,6 @@
       });
     }
 
-    // NUEVA FUNCIÓN PARA SUBIR IMAGEN A LA CÁMARA
     function setupCamUploader() {
       const uploader = document.getElementById('camUploader');
       uploader.addEventListener('change', (e) => {
